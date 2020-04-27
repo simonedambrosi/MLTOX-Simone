@@ -23,7 +23,7 @@ def linbinning(values, xmin=-1, xmax=-1, n=10):
 
     print("Linear binning")
     for ibin in range(len(histo)):
-        print "LIN",ibin,xmin+ibin*delta, histo[ibin], histo[ibin]/len(values)
+        print("LIN",ibin,xmin+ibin*delta, histo[ibin], histo[ibin]/len(values))
 
     return
 
