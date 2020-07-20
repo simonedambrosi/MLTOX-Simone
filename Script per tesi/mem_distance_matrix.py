@@ -48,15 +48,24 @@ How to combine computed distances
 def combine_distances(ham1, euc2, pub3, tan4, alphas = [1,1,1,1], choice = [0,0]):
     print('Combining...')
     if choice == [0,0]:
+        print('''Parametri: Hamming 1 --> {}, Euclidean 2 --> {}'''.format(alphas[0],alphas[1]))
         return alphas[0] * ham1 + alphas[1] * euc2
     
     elif choice == [1,0]:
+        print('''Parametri: Hamming 1 --> {}, Euclidean 2 --> {}, Pubchem2d 3 --> {}'''.format(alphas[0],
+                                                                                             alphas[1],
+                                                                                             alphas[2]))
         return alphas[0] * ham1 + alphas[1] * euc2 + alphas[2] * pub3
     
     elif choice == [0,1]:
+        print('''Parametri: Hamming 1 --> {}, Euclidean 2 --> {}, Tanimoto 4 --> {}'''.format(alphas[0],
+                                                                                             alphas[1],
+                                                                                             alphas[3]))
         return alphas[0] * ham1 + alphas[1] * euc2 + alphas[3] * tan4
     
     else:
+        print('''Parametri: Hamming 1 --> {}, Euclidean 2 --> {},
+            Pubchem2d 3 --> {}, Tanimoto 4 --> {}'''.format(alphas[0], alphas[1], alphas[2], alphas[3]))
         return alphas[0] * ham1 + alphas[1] * euc2 + alphas[2] * pub3 + alphas[3] * tan4
 
 
@@ -133,5 +142,22 @@ def tanimoto_matrix(X):
     return squareform(GetTanimotoDistMat([FingerprintMols.FingerprintMol(MolFromSmiles(X.smiles[i]))
                                                  for i in range(len(X.smiles))]))
 
+'''
+Fast Matrices
+'''
 
-
+def fast_dist_mat(X, len_X_train, cat_features, num_features, alphas =[], choice =[0,0]):
+    print('START fast...')
+    if choice == [1,0]:
+        print('You choose Hamming 1, Euclidean 2 and Hamming on pubchem2d 3...')
+        dist_matr = alphas[0]*hamming_matrix(X, cat_features) + alphas[1]*euclidean_matrix(X, num_features) + alphas[2]*pubchem2d_matrix(X)
+    
+    elif choice == [0,1]:
+        print('You choose Hamming 1, Euclidean 2, Tanimoto 4...')
+        dist_matr = alphas[0]*hamming_matrix(X, cat_features) + alphas[1]*euclidean_matrix(X, num_features) + alphas[3]*tanimoto_matrix(X)
+    
+    dist_matr_train = dist_matr[:len_X_train,:len_X_train]
+    dist_matr_test = dist_matr[len_X_train:,:len_X_train]
+    print('...FINISH')
+    
+    return dist_matr_train, dist_matr_test
