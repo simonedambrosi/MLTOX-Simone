@@ -5,6 +5,7 @@ Created on Sat Jul 18 11:52:30 2020
 @author: Simone
 """
 import numpy as np
+import pandas as pd
 
 from scipy.spatial.distance import pdist, squareform
 
@@ -125,18 +126,12 @@ def euclidean_matrix(X, num_features):
     print('Start Euclidean...')
     return squareform(pdist(X[num_features], metric = "euclidean"))
 
+# 8 minutes more or less
 def pubchem2d_matrix(X):
     print('Start Hamming su Pubchem2d...')
-    a = np.array((X.pubchem2d[0].replace('', ' ').strip().split(' '),
-                  X.pubchem2d[1].replace('', ' ').strip().split(' ')))
-    
-    for i in range(2,len(X.pubchem2d)):
-        a = np.concatenate((a,[X.pubchem2d[i].replace('', ' ').strip().split(' ')]))
+    return squareform(pdist(pd.DataFrame(pd.DataFrame(X['pubchem2d'].values).apply(lambda x: x.str.replace('', ' ').str.strip().str.split(' '),axis = 1)[0].to_list()),  metric = 'hamming'))
 
-    pub_matrix = squareform(pdist(a, metric = 'hamming'))
-    
-    return pub_matrix
-
+# more than 20 minutes
 def tanimoto_matrix(X):
     print('Start Tanimoto...')
     return squareform(GetTanimotoDistMat([FingerprintMols.FingerprintMol(MolFromSmiles(X.smiles[i]))
@@ -146,18 +141,17 @@ def tanimoto_matrix(X):
 Fast Matrices
 '''
 
-def fast_dist_mat(X, len_X_train, cat_features, num_features, alphas =[], choice =[0,0]):
-    print('START fast...')
+def basic_matrix(X, cat_features = [], num_features = [], a_ham = 0.0016102620275609393):   
+    # Hamming and Euclidean
+    return a_ham * hamming_matrix(X, cat_features) + euclidean_matrix(X, num_features)
+
+
+def fast_dist_mat(X, len_X_train, cat_features, num_features, alphas = [0,1,0,0], choice = [0,0]):
+    dist_matr = basic_matrix(X, cat_features, num_features, alphas[0]) 
     if choice == [1,0]:
-        print('You choose Hamming 1, Euclidean 2 and Hamming on pubchem2d 3...')
-        dist_matr = alphas[0]*hamming_matrix(X, cat_features) + alphas[1]*euclidean_matrix(X, num_features) + alphas[2]*pubchem2d_matrix(X)
-    
+        dist_matr += alphas[2] * pubchem2d_matrix(X)
     elif choice == [0,1]:
-        print('You choose Hamming 1, Euclidean 2, Tanimoto 4...')
-        dist_matr = alphas[0]*hamming_matrix(X, cat_features) + alphas[1]*euclidean_matrix(X, num_features) + alphas[3]*tanimoto_matrix(X)
+        dist_matr += alphas[3] * tanimoto_matrix(X)
     
-    dist_matr_train = dist_matr[:len_X_train,:len_X_train]
-    dist_matr_test = dist_matr[len_X_train:,:len_X_train]
-    print('...FINISH')
+    return dist_matr[:len_X_train,:len_X_train], dist_matr[len_X_train:,:len_X_train]
     
-    return dist_matr_train, dist_matr_test
