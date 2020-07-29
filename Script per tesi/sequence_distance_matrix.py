@@ -22,6 +22,28 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
 
 """
+Encoding for Multiclass
+"""
+def multiclass(var):
+    for i in range(0,len(var)):
+        if var[i] <= 10**-1:
+            var[i] = 5
+        
+        elif 10**-1 < var[i] <= 10**0:
+            var[i] = 4
+        
+        elif 10**0 < var[i] <= 10**1:
+            var[i] = 3
+            
+        elif 10**1 < var[i] <= 10**2:
+            var[i] = 2
+            
+        else:
+            var[i] = 1
+    return pd.to_numeric(var, downcast = 'integer')
+
+
+"""
 Building 4 matrices:
     1) Hamming on categorical: 
         inputs: DataFrame, List of categorical features
