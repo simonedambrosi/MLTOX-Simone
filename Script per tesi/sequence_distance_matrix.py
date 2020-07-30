@@ -73,17 +73,31 @@ def tanimoto_matrix(X):
 Compute distances.
 '''
 
-def basic_matrix(X, cat_features = [], num_features = [],
-                   a_ham = 0.0016102620275609393):
-    
-    # Hamming and Euclidean
+# Euclidean and Hamming on categorical
+def basic_matrix(X, cat_features = [], num_features = [], a_ham = 0.0016102620275609393):
     return a_ham * hamming_matrix(X, cat_features) + euclidean_matrix(X, num_features)
     
+# Euclidean and Pubchem2d
 def euc_pub_matrix(X, num_features = [], a_pub = 0):
     return euclidean_matrix(X, num_features) + a_pub * pubchem2d_matrix(X)
 
+# Euclidean and Tanimoto
 def euc_tan_matrix(X, num_features = [], a_tan = 0):
     return euclidean_matrix(X, num_features) + a_tan * tanimoto_matrix(X)
+
+# Euclidean, Hamming on categorical, Pubchem2d
+def pub_basic_matrix(X, cat_features = [], num_features = [], a_ham = 0, a_pub = 0):
+    return a_ham * hamming_matrix(X, cat_features) + euclidean_matrix(X, num_features) + a_pub * pubchem2d_matrix(X)
+
+# Euclidean, Hamming on categorical, Tanimoto
+def tan_basic_matrix(X, cat_features = [], num_features = [], a_ham = 0, a_tan = 0):
+    return a_ham * hamming_matrix(X, cat_features) + euclidean_matrix(X, num_features) + a_tan * tanimoto_matrix(X)
+
+# Euclidean, Hamming on categorical, Pubchem2d, Tanimoto
+def all_matrix(X, cat_features = [], num_features = [], a_ham = 0, a_pub = 0, a_tan = 0):
+    return a_ham * hamming_matrix(X, cat_features) + euclidean_matrix(X, num_features) + a_pub * pubchem2d_matrix(X) + a_tan * tanimoto_matrix(X)
+
+
 
 '''
 Cross-Validation to find the best combination of alphas and hyperparameters of KNN
