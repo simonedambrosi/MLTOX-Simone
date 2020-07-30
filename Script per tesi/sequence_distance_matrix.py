@@ -12,8 +12,7 @@ from time import ctime
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import sem
 
-from rdkit.Chem import MolFromSmiles
-from rdkit.Chem.Fingerprints import FingerprintMols
+from rdkit.DataStructs.cDataStructs import CreateFromBitString
 from rdkit.DataManip.Metric.rdMetricMatrixCalc import GetTanimotoDistMat
 
 from sklearn.model_selection import KFold
@@ -68,8 +67,7 @@ def pubchem2d_matrix(X):
     return squareform(pdist(pd.DataFrame(pd.DataFrame(X['pubchem2d'].values).apply(lambda x: x.str.replace('', ' ').str.strip().str.split(' '),axis = 1)[0].to_list()),  metric = 'hamming'))
 
 def tanimoto_matrix(X):
-    return squareform(GetTanimotoDistMat([FingerprintMols.FingerprintMol(MolFromSmiles(X.smiles[i]))
-                                                 for i in range(len(X.smiles))]))
+    return squareform(GetTanimotoDistMat(X['pubchem2d'].apply(CreateFromBitString).to_list()))
 
 '''
 Compute distances.
