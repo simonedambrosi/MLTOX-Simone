@@ -213,7 +213,7 @@ def cv_params(X, y, categorical, non_categorical, sequence_pub = [], sequence_ta
 
 
 
-def cv_params_new(X,y, categorical,non_categorical,
+def cv_params_new(X,y, categorical, non_categorical,
                   sequence_pub = [], sequence_tan = [], sequence_ham = [],
                   choice = [0,0,0],
                   ks = range(1,6,2), leaf_size = range(30, 101, 10),
@@ -383,7 +383,56 @@ def cv_params_new(X,y, categorical,non_categorical,
                         best_k = k
                         best_accuracy = avg_acc
                         best_leaf = ls
+                        
+    elif choice == [0,0,0]:
+        print('Computing Euclidean ...')
+        basic_mat = euclidean_matrix(X, non_categorical)
 
+        for ah in sequence_ham:
+            print('\n', ctime())
+            print('Adding Hamming 1 (Categorical)... alpha = {}'.format(ah))
+            dist_matr = ah * hamming_matrix(X, categorical)
+            dist_matr += basic_mat
+            dist_matr = pd.DataFrame(dist_matr)
+            print(ctime())
+            print('Start CV...')
+            for k in ks:
+                for ls in leaf_size:
+                    
+                    kf = KFold(n_splits=5, shuffle=True)
+                    accs = []
+                    rmse = []
+                    for train_index, test_index in kf.split(dist_matr):
+                
+                        X_train = dist_matr.iloc[train_index, train_index]
+                        X_test = dist_matr.iloc[test_index, train_index]
+                        y_train = y[train_index]
+                        y_test = y[test_index]
+                        
+                        neigh = KNeighborsClassifier(metric = 'precomputed',
+                                                     n_neighbors=k, n_jobs=-2,
+                                                     leaf_size=ls)
+                        neigh.fit(X_train, y_train.ravel())
+                        y_pred = neigh.predict(X_test)
+
+                        accs.append(accuracy_score(y_test, y_pred))
+                        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+                        
+                    avg_acc = np.mean(accs)
+                    se_acc = sem(accs)
+                    
+                    avg_rmse = np.mean(rmse)
+                    se_rmse = sem(rmse)
+                    if (avg_acc > best_accuracy):
+                        print('''New best params found! alpha:{}, k:{}, leaf:{},
+                                                        acc:  {}, st.error:  {},
+                                                        rmse: {}, st.error:  {}'''.format(ah, k, ls,
+                                                                                        avg_acc, se_acc,
+                                                                                        avg_rmse, se_rmse))
+                        best_alpha = ah
+                        best_k = k
+                        best_accuracy = avg_acc
+                        best_leaf = ls
     
     return best_accuracy, best_alpha, best_k, best_leaf
 
