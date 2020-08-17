@@ -151,8 +151,8 @@ def create_table(train_mat, test_mat, y_train, y_test, encoding = 'binary'):
 '''
 Brute display of table
 '''
-def display_table(table, main_title, encoding = 'binary', k):
-#     k = [i for i in range(1,13,1)] + [i for i in range(13,52,2)]
+def display_table(table, main_title, encoding = 'binary'):
+    k = [i for i in range(1,13,1)] + [i for i in range(13,52,2)]
     
     if encoding == 'binary':
         plt.figure(figsize = [20,15])

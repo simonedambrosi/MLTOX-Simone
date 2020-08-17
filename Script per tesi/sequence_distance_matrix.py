@@ -216,7 +216,7 @@ def cv_params(X, y, categorical, non_categorical, sequence_pub = [], sequence_ta
 def cv_params_new(X,y, categorical, non_categorical,
                   sequence_pub = [], sequence_tan = [], sequence_ham = [],
                   choice = [0,0,0],
-                  ks = range(1,6,2), leaf_size = range(30, 101, 10),
+                  ks = range(1,6,2), leaf_size = range(10, 101, 10),
                   a_ham = 0,  a_pub = 0, a_tan = 0):
     
     '''
