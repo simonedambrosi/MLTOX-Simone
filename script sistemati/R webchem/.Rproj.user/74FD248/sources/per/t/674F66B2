@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1598265066631.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3182147824",
+    "id" : "674F66B2",
+    "lastKnownWriteTime" : 1598265159,
+    "last_content_update" : 1598265159509,
+    "path" : "C:/Users/Simone/Desktop/MLTOX-Simone/Script per tesi/R webchem/cas_find_smiles.R",
+    "project_path" : "cas_find_smiles.R",
+    "properties" : {
+        "cursorPosition" : "25,44",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

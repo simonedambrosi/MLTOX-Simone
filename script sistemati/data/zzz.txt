@@ -1,0 +1,11 @@
+cas_not_pubchem2d.csv --------------- cas number and SMILES of chemicals with trouble due to package PubchemPy
+cas_not_smiles.csv ------------------ cas number of chemicals with trouble due to package CirPy
+cas_number.csv ---------------------- all chemicals used for experiments
+cas_smiles_pubchem2d.csv ------------ final db not ready to be merged with results yet
+cas_smiles_pubchem2d_features ------- final db ready to be merged with results (contains features extracted from 				      SMILES)
+cas_to_smiles.csv ------------------- all chemicals used for experiments (chemical without SMILES included)
+
+fish_all.csv ------------------------ all fish used for experiments
+fish_tested.csv --------------------- all fish used for experiments of interest
+
+prefiltered_results.csv ------------- filtered information about experiments (which chemical was tested on which 				              species, what the condition of experiments and its results) 
