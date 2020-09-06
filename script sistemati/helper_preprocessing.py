@@ -198,12 +198,14 @@ def process_chemicals(DATA_PATH_CHEMICAL_FEATURES):
 
 def repeated_experiments(imputed_db):
     db = imputed_db.copy()
-    db_species = db[["species", 'class', 'tax_order', 'family', 'genus']]
-    db_species = db_species.groupby("species").first()
+    db['fish'] = db['class'] + ' ' + db['tax_order'] + ' ' + db['family'] + ' ' + db['genus'] + ' ' + db['species']
     
-    final_db = db.groupby(by = ['test_cas', 'obs_duration_mean', 'conc1_type', 'species', 'exposure_type',
+    db_species = db[['class', 'tax_order', 'family', 'genus', "species", 'fish']]
+    db_species = db_species.groupby("fish").first()
+    
+    final_db = db.groupby(by = ['test_cas', 'obs_duration_mean', 'conc1_type', 'fish', 'exposure_type',
                      'control_type', 'media_type', 'application_freq_unit']).agg('median').reset_index()
-    final_db = final_db.merge(db_species, on='species')
+    final_db = final_db.merge(db_species, on='fish')
 
     return final_db
 

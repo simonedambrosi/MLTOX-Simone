@@ -83,3 +83,21 @@ def df_to_newick(dataframe):
     new_tree += ');'
     
     return new_tree
+
+def multiclass_encoding(var):
+    for i in range(0,len(var)):
+        if var[i] <= 10**-1:
+            var[i] = 5
+        
+        elif 10**-1 < var[i] <= 10**0:
+            var[i] = 4
+        
+        elif 10**0 < var[i] <= 10**1:
+            var[i] = 3
+            
+        elif 10**1 < var[i] <= 10**2:
+            var[i] = 2
+            
+        else:
+            var[i] = 1
+    return pd.to_numeric(var, downcast = 'integer')
