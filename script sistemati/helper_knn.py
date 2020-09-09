@@ -14,6 +14,7 @@ from math import sqrt
 from general_helper import multiclass_encoding
 
 from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import KFold
@@ -30,7 +31,17 @@ def load_data_knn(DATA_PATH, encoding, seed = 42):
     
     db = pd.read_csv(DATA_PATH).drop(columns = ['Unnamed: 0', 'test_cas','smiles'])
     
-    # Ordinal Encoding
+    non_categorical = ['obs_duration_mean', 'alone_atom_number', 'doubleBond', 'tripleBond', 'ring_number', 'MorganDensity', 'LogP',
+                       'oh_count']
+    
+    # MinMax trasform for numerical variables
+    for nc in non_categorical:
+        minmax = MinMaxScaler()
+        minmax.fit(db[[nc]])
+        db[[nc]] = minmax.transform(db[[nc]])
+    
+    
+    # Ordinal Encoding for categorical variables
     encoder = OrdinalEncoder(dtype = int)
     
     encoder.fit(db[['conc1_type', 'exposure_type', 'control_type', 'media_type', 'application_freq_unit',
@@ -41,6 +52,7 @@ def load_data_knn(DATA_PATH, encoding, seed = 42):
         db[['conc1_type', 'exposure_type', 'control_type', 'media_type', 'application_freq_unit',
                     'class', 'tax_order', 'family', 'genus', 'species']])+1
     
+    # Encoding for target variable: binary and multiclass
     if encoding == 'binary':
         db['conc1_mean'] = np.where(db['conc1_mean'].values > 1, 1, 0)
 
@@ -50,7 +62,7 @@ def load_data_knn(DATA_PATH, encoding, seed = 42):
     
     X = db.drop(columns = 'conc1_mean')
     y = db['conc1_mean'].values
-    
+
     # splitting
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=seed)
 
@@ -166,36 +178,36 @@ def display_table(table, main_title, encoding = 'binary'):
         plt.subplot(3,2,1)
         plt.suptitle(main_title)
 
-        plt.plot(k, table.acc_train)
-        plt.plot(k, table.acc_test)
+        plt.plot(k, table.acc_train, '-o')
+        plt.plot(k, table.acc_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('Accuracy')
 
         plt.subplot(3,2,2)
-        plt.plot(k,table.rmse_train)
-        plt.plot(k,table.rmse_test)
+        plt.plot(k,table.rmse_train, '-o')
+        plt.plot(k,table.rmse_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('RMSE')
         
         plt.subplot(3,2,3)
-        plt.plot(k, table.auc_train)
-        plt.plot(k, table.auc_test)
+        plt.plot(k, table.auc_train, '-o')
+        plt.plot(k, table.auc_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('AUC')
 
         plt.subplot(3,2,4)
-        plt.plot(k, table.recall_train)
-        plt.plot(k, table.recall_test)
+        plt.plot(k, table.recall_train, '-o')
+        plt.plot(k, table.recall_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('Recall')
 
         plt.subplot(3,2,5)
-        plt.plot(k, table.precision_train)
-        plt.plot(k, table.precision_test)
+        plt.plot(k, table.precision_train, '-o')
+        plt.plot(k, table.precision_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('Precision')
@@ -205,15 +217,15 @@ def display_table(table, main_title, encoding = 'binary'):
         plt.subplot(1,2,1)
         plt.suptitle(main_title)
 
-        plt.plot(k, table.acc_train)
-        plt.plot(k, table.acc_test)
+        plt.plot(k, table.acc_train, '-o')
+        plt.plot(k, table.acc_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('Accuracy')
 
         plt.subplot(1,2,2)
-        plt.plot(k,table.rmse_train)
-        plt.plot(k,table.rmse_test)
+        plt.plot(k,table.rmse_train, '-o')
+        plt.plot(k,table.rmse_test, '-o')
         plt.grid()
         plt.xlabel('k')
         plt.title('RMSE')
@@ -371,8 +383,7 @@ def cv_params_new(X,y, categorical, non_categorical,
                     kf = KFold(n_splits=5, shuffle=True)
                     accs = []
                     rmse = []
-                    for train_index, test_index in kf.split(dist_matr):
-                
+                    for train_index, test_index in kf.split(dist_matr):                        
                         X_train = dist_matr.iloc[train_index, train_index]
                         X_test = dist_matr.iloc[test_index, train_index]
                         y_train = y[train_index]
@@ -408,9 +419,176 @@ def cv_params_new(X,y, categorical, non_categorical,
 
 
 
+# With matrix rescaling (only euclidean and hamming --> choice = [0,0]
+def _cv_params_new(X,y, categorical, non_categorical,
+                  sequence_pub = [], sequence_tan = [], sequence_ham = [],
+                  choice = [0,0],
+                  ks = range(1,10,2), leaf_size = range(10, 101, 10),
+                  a_ham = 0,  a_pub = 0, a_tan = 0):
+    
+    '''
+    choice: [0,0] optimize Hamming 1 with Euclidean
+            [1,0] optimize Hamming 1 with Euclidean and Pubchem2d
+            [0,1] optimize Pubchem2d with Euclidean and Hamming 1
+    '''
+    np.random.seed(123)
+    print(ctime())
+    print('START...')
+    best_accuracy = 0
+    best_alpha = 0
+    best_k = 0
+    best_leaf = 0
+    
+    if choice == [1,0]:
+        print('Computing Euclidean and Pubchem2d Matrix...')
+        basic_mat = euc_pub_matrix(X, non_categorical, a_pub)
+        
+        for ah in sequence_ham:
+            print('Adding Hamming 1 (Categorical)... alpha = {}'.format(ah))
+            dist_matr = ah * pubchem2d_matrix(X)
+            dist_matr += basic_mat
+            dist_matr = pd.DataFrame(dist_matr)
+            print('Start CV...')
+            for k in ks:
+                for ls in leaf_size:
+                    
+                    kf = KFold(n_splits=5, shuffle=True)
+                    accs = []
+                    rmse = []
+                    for train_index, test_index in kf.split(dist_matr):
+                
+                        X_train = dist_matr.iloc[train_index, train_index]
+                        X_test = dist_matr.iloc[test_index, train_index]
+                        y_train = y[train_index]
+                        y_test = y[test_index]
+                        
+                        neigh = KNeighborsClassifier(metric = 'precomputed',
+                                                     n_neighbors=k, n_jobs=-2,
+                                                     leaf_size=ls)
+                        neigh.fit(X_train, y_train.ravel())
+                        y_pred = neigh.predict(X_test)
+
+                        accs.append(accuracy_score(y_test, y_pred))
+                        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+                        
+                    avg_acc = np.mean(accs)
+                    se_acc = sem(accs)
+                    
+                    avg_rmse = np.mean(rmse)
+                    se_rmse = sem(rmse)
+                    if (avg_acc > best_accuracy):
+                        print('''New best params found! alpha:{}, k:{}, leaf:{},
+                                                        acc:  {}, st.error:  {},
+                                                        rmse: {}, st.error:  {}'''.format(ah, k, ls,
+                                                                                        avg_acc, se_acc,
+                                                                                        avg_rmse, se_rmse))
+                        best_alpha = ah
+                        best_k = k
+                        best_accuracy = avg_acc
+                        best_leaf = ls
 
 
+    elif choice ==  [0,1]:
+        print('Computing Basic Matrix: Hamming 1 and Euclidean 2...')
+        basic_mat = basic_matrix(X, categorical, non_categorical, a_ham)
+        
+        for ap in sequence_pub:
+            print('Adding Hamming 3 (Pubchem2d)... alpha = {}'.format(ap))
+            dist_matr = ap * pubchem2d_matrix(X)
+            dist_matr += basic_mat
+            dist_matr = pd.DataFrame(dist_matr)
+            print('Start CV...')
+            for k in ks:
+                for ls in leaf_size:
+                    
+                    kf = KFold(n_splits=5, shuffle=True)
+                    accs = []
+                    rmse = []
+                    for train_index, test_index in kf.split(dist_matr):
+                
+                        X_train = dist_matr.iloc[train_index, train_index]
+                        X_test = dist_matr.iloc[test_index, train_index]
+                        y_train = y[train_index]
+                        y_test = y[test_index]
+                        
+                        neigh = KNeighborsClassifier(metric = 'precomputed',
+                                                     n_neighbors=k, n_jobs=-2,
+                                                     leaf_size=ls)
+                        neigh.fit(X_train, y_train.ravel())
+                        y_pred = neigh.predict(X_test)
 
+                        accs.append(accuracy_score(y_test, y_pred))
+                        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+                        
+                    avg_acc = np.mean(accs)
+                    se_acc = sem(accs)
+                    
+                    avg_rmse = np.mean(rmse)
+                    se_rmse = sem(rmse)
+                    if (avg_acc > best_accuracy):
+                        print('''New best params found! alpha:{}, k:{}, leaf:{},
+                                                        acc:  {}, st.error:  {},
+                                                        rmse: {}, st.error:  {}'''.format(ap, k, ls,
+                                                                                        avg_acc, se_acc,
+                                                                                        avg_rmse, se_rmse))
+                        best_alpha = ap
+                        best_k = k
+                        best_accuracy = avg_acc
+                        best_leaf = ls
+        
+    elif choice == [0,0]:
+        print('Computing Euclidean ...')
+        basic_mat = euclidean_matrix(X, non_categorical)
+
+        for ah in sequence_ham:
+            print('Computing Hamming 1 (Categorical)... alpha = {}'.format(ah))
+            dist_matr = ah * hamming_matrix(X, categorical)
+            print('Start CV...')
+            for k in ks:
+                for ls in leaf_size:
+                    
+                    kf = KFold(n_splits=5, shuffle=True)
+                    accs = []
+                    rmse = []
+                    for train_index, test_index in kf.split(dist_matr):                        
+                        print('Rescaling and... Adding...')
+                        max_euc_train = pd.DataFrame(basic_mat).iloc[train_index, train_index].max().max()
+                        
+                        dist_matr += basic_mat/max_euc_train
+                        dist_matr = pd.DataFrame(dist_matr)
+                        
+                        X_train = dist_matr.iloc[train_index, train_index]
+                        X_test = dist_matr.iloc[test_index, train_index]
+                        y_train = y[train_index]
+                        y_test = y[test_index]
+                        
+                        neigh = KNeighborsClassifier(metric = 'precomputed',
+                                                     n_neighbors=k, n_jobs=-2,
+                                                     leaf_size=ls)
+                        neigh.fit(X_train, y_train.ravel())
+                        y_pred = neigh.predict(X_test)
+
+                        accs.append(accuracy_score(y_test, y_pred))
+                        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+                        
+                    avg_acc = np.mean(accs)
+                    se_acc = sem(accs)
+                    
+                    avg_rmse = np.mean(rmse)
+                    se_rmse = sem(rmse)
+                    if (avg_acc > best_accuracy):
+                        print('''New best params found! alpha:{}, k:{}, leaf:{},
+                                                        acc:  {}, st.error:  {},
+                                                        rmse: {}, st.error:  {}'''.format(ah, k, ls,
+                                                                                        avg_acc, se_acc,
+                                                                                        avg_rmse, se_rmse))
+                        best_alpha = ah
+                        best_k = k
+                        best_accuracy = avg_acc
+                        best_leaf = ls
+                        
+    print(ctime())
+    return best_accuracy, best_alpha, best_k, best_leaf
 
 
 

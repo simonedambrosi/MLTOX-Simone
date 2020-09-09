@@ -1,0 +1,5 @@
+Il modello H2O è il miglior modello Random Forest per il caso binario che ho costruito
+E' possibile ricaricarlo nell'ambiente H2O e valutarlo con lo split ratios = [0.7] e seed = 123
+
+The model H2O in this folder is the best Random Forest BINARY model that I ever built 
+It's possible to load in a H2O framework to evaluate its performance. For reproducibility, the split of the dataset require ratios = [0.7] and seed = 123
