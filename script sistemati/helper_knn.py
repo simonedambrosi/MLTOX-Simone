@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import recall_score, roc_auc_score, precision_score, accuracy_score, mean_squared_error
+from sklearn.metrics import confusion_matrix, log_loss
 
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import sem
