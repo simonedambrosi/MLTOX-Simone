@@ -18,8 +18,8 @@ def null_output_counts(dataframe):
     
     #Count total NaN + NR + NC
     for i in features_interested:
-        df_nan.loc['null_values_inc_NC_NR%', i] = (sum(dataframe[i].isnull()) + len(dataframe[dataframe[i] == "NR"]) + len(dataframe[dataframe[i] =="NC"]))/len(dataframe)*100
-        df_nan.loc['#outputs', i] = len(dataframe[i].unique())
+        df_nan.loc[i, 'null_values_inc_NC_NR%'] = (sum(dataframe[i].isnull()) + len(dataframe[dataframe[i] == "NR"]) + len(dataframe[dataframe[i] =="NC"]))/len(dataframe)*100
+        df_nan.loc[i, '#outputs'] = len(dataframe[i].unique())
     return df_nan
 
 def checkTree(dataset):
