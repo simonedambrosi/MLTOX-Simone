@@ -25,8 +25,8 @@ from scipy.stats import sem
 
 def load_datafusion_datasets(DATA_MORTALITY_PATH, DATA_OTHER_ENDPOINT_PATH, encoding = 'binary', seed = 42):
     
-    db_datafusion = pd.read_csv('data/datafusion_db_processed.csv').drop(columns = 'Unnamed: 0')
-    db_mortality = pd.read_csv('data/lc_db_processed.csv').drop(columns = 'Unnamed: 0')   
+    db_datafusion = pd.read_csv(DATA_OTHER_ENDPOINT_PATH).drop(columns = 'Unnamed: 0')
+    db_mortality = pd.read_csv(DATA_MORTALITY_PATH).drop(columns = 'Unnamed: 0')   
     
     # bonds_number and Mol have been minmax transformed yet
     non_categorical = ['obs_duration_mean', 'alone_atom_number', 'doubleBond', 'tripleBond', 'ring_number', 'MorganDensity', 'LogP',

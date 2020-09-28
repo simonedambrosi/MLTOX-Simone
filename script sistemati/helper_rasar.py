@@ -19,7 +19,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import recall_score, confusion_matrix, precision_score, accuracy_score, mean_squared_error
-from sklearn.utils import shuffle
 
 
 from scipy.spatial.distance import pdist, squareform
@@ -115,15 +114,8 @@ def nn1_rasar():
     return nn1
 
 
-def nn5_rasar():
-    X, y = load_data_rasar('data/lc_db_processed.csv', encoding = 'binary', seed = 42)
-    
-    _, _, y_train, y_test = train_test_split(X, y, test_size = 0.33, random_state = 42)
-    
-    del _
-    
-    len_X_train = len(y_train)
-    
+def nn5_rasar(X, y):
+        
     categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
                'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
 
@@ -131,30 +123,91 @@ def nn5_rasar():
                    'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
     
     print('Computing distance matrix...', ctime())
-    dist_matr = euc_ham_pub_matrix(X, non_categorical, categorical, 
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
                                a_ham = 0.009473684210526315, a_pub = 0.007105263157894737)
     
-    dist_matr = pd.DataFrame(dist_matr)
+    distance_matrix = pd.DataFrame(distance_matrix)
     
-    dist_matr_train = dist_matr.iloc[:len_X_train,:len_X_train]
-    dist_matr_test = dist_matr.iloc[len_X_train:,:len_X_train]
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    accs = []
+    rmse = []
+    sens = []
+    precs = []
+    specs = []
+    for train_index, test_index in kf.split(distance_matrix):
+
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        train_5nn, test_5nn = df_5nn_rasar(dist_matr_train, dist_matr_test, y_train)
+        
+        lrc = LogisticRegression(random_state=0, fit_intercept = False, solver = 'saga', penalty = 'elasticnet',
+                        l1_ratio = 1)
+        lrc.fit(train_5nn, y_train)
+        y_pred = lrc.predict(test_5nn)
+        
+        tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     
-    print('Computing 5-NN...', ctime())
+        accs.append(accuracy_score(y_test, y_pred))
+        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+        sens.append(recall_score(y_test, y_pred))
+        precs.append(precision_score(y_test, y_pred))
+        specs.append(tn/(tn+fp))
+        
+    print('...END Simple RASAR', ctime())
+    
+    avg_accs = np.mean(accs)
+    se_accs = sem(accs)
+    
+    avg_rmse = np.mean(rmse)
+    se_rmse = sem(rmse)
+    
+    avg_sens = np.mean(sens)
+    se_sens = sem(sens)
+    
+    avg_precs = np.mean(precs)
+    se_precs = sem(precs)
+    
+    avg_specs = np.mean(specs)
+    se_specs = sem(specs)
+    
+    print('''Accuracy: \t {}, se: {}
+RMSE: \t\t {}, se: {}
+Sensitivity: \t {}, se: {}
+Precision: \t {}, se: {}
+Specificity: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_sens, se_sens,
+                                     avg_precs, se_precs, avg_specs, se_specs))
+    return 
+
+def df_5nn_rasar(train_matrix, test_matrix, y_train):
     neigh5 = KNeighborsClassifier(metric = 'precomputed', n_neighbors=5, n_jobs=-2, leaf_size=40)
-    neigh5.fit(dist_matr_train, y_train)
+    neigh5.fit(train_matrix, y_train)
     
+    ######## DF Train #########
+    tmp_train = pd.DataFrame(neigh5.kneighbors(train_matrix, return_distance = False),
+                             columns = ['neigh1', 'neigh2', 'neigh3', 'neigh4', 'neigh5'])
     
-    tmp = pd.DataFrame(neigh5.kneighbors(dist_matr_test, return_distance = False),
+    train_5nn = pd.DataFrame({'label_neigh1': y_train[tmp_train.neigh1], 'label_neigh2': y_train[tmp_train.neigh1],
+                       'label_neigh3': y_train[tmp_train.neigh3], 'label_neigh4': y_train[tmp_train.neigh4],
+                       'label_neigh5': y_train[tmp_train.neigh5]}).T.apply(pd.value_counts).T.fillna(0)
+
+    train_5nn.columns = ['label0_count', 'label1_count']
+    
+    ######## DF Test ##########
+    tmp_test = pd.DataFrame(neigh5.kneighbors(test_matrix, return_distance = False),
                        columns = ['neigh1', 'neigh2', 'neigh3', 'neigh4', 'neigh5'])
 
-    
-    nn5 = pd.DataFrame({'label_neigh1': y_train[tmp.neigh1], 'label_neigh2': y_train[tmp.neigh1],
-                       'label_neigh3': y_train[tmp.neigh3], 'label_neigh4': y_train[tmp.neigh4],
-                       'label_neigh5': y_train[tmp.neigh5]}).T.apply(pd.value_counts).T.fillna(0)
+    test_5nn = pd.DataFrame({'label_neigh1': y_train[tmp_test.neigh1], 'label_neigh2': y_train[tmp_test.neigh1],
+                       'label_neigh3': y_train[tmp_test.neigh3], 'label_neigh4': y_train[tmp_test.neigh4],
+                       'label_neigh5': y_train[tmp_test.neigh5]}).T.apply(pd.value_counts).T.fillna(0)
 
-    nn5.columns = ['label0_count', 'label1_count']
-    print(ctime())
-    return nn5
+    test_5nn.columns = ['label0_count', 'label1_count']
+    
+    return train_5nn, test_5nn
+
 
 def right_neighbor(neighbors, X_train, y_train, y_check):
     # IDX Neighbors
