@@ -79,7 +79,35 @@ def encoding_categorical(cat_cols, database, database_df):
     database_df[cat_cols] = encoder.transform(database_df[cat_cols])+1
     
     return database, database_df
+
+def find_similar_exp(exp_mortality, db_datafusion, compare_features):
+      
+    sim_exp = (db_datafusion[compare_features] == exp_mortality[compare_features]).all(axis = 1)
+    out = db_datafusion.conc1_mean[sim_exp].index.tolist()
     
+    if len(out) != 0:
+        
+        if len(out) == 1:
+            if db_datafusion.conc1_mean[sim_exp].values[0] == 0:
+                return -1
+            else:
+                return 1
+        
+        else:
+            if len(out)%2 == 0:
+                if db_datafusion.conc1_mean[sim_exp].values[0] == 0:
+                    return -1
+                else:
+                    return 1
+                
+            else:
+                if db_datafusion.conc1_mean[sim_exp].value_counts().index[0] == 0:
+                    return -1
+                else:
+                    return 1
+    else:
+        return 0
+
 
 def hamming_matrix_datafusion(X_mor, X_fus, cat_features):
     return cdist(X_mor[cat_features], X_fus[cat_features], metric = "hamming")
@@ -210,6 +238,9 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
     non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
                'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
     
+    comparing = ['test_cas', 'obs_duration_mean', 'conc1_type', 'exposure_type', 'control_type', 'media_type',
+             'application_freq_unit', 'class', 'tax_order', 'family', 'genus', 'species']
+    
     db_datafusion_rasar_train = pd.DataFrame()
     db_datafusion_rasar_test = pd.DataFrame()
     
@@ -236,7 +267,9 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
             knn1 = KNeighborsClassifier(metric = 'precomputed', n_jobs = -2, n_neighbors = 1)
             knn1.fit(pd.DataFrame(train_matrix_1), np.repeat(1, train_matrix_1.shape[0]))
             
+            ####################
             ########### DF-TRAIN
+            ####################
             
             train_test_matrix_0 = euc_ham_pub_matrix_datafusion(db_mortality_train, db_end_eff_0,
                                                                 non_categorical, categorical,
@@ -256,7 +289,14 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
             db_datafusion_rasar_train[endpoint + '_' + effect + '_0'] = neigh0[0].ravel()
             db_datafusion_rasar_train[endpoint + '_' + effect + '_1'] = neigh1[0].ravel()
             
+            # FINDING LABELS
+            db_datafusion_rasar_train[endpoint+ '_' + effect + '_label'] = db_mortality_train.apply(lambda x: find_similar_exp(
+                x, db_endpoint[db_endpoint.effect == effect], comparing), axis = 1).reset_index(drop = True)
+            
+            
+            ###################
             ########### DF-TEST
+            ###################
             
             test_test_matrix_0 = euc_ham_pub_matrix_datafusion(db_mortality_test, db_end_eff_0,
                                                                non_categorical, categorical,
@@ -274,6 +314,11 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
             
             db_datafusion_rasar_test[endpoint + '_' + effect + '_0'] = neigh0[0].ravel()
             db_datafusion_rasar_test[endpoint + '_' + effect + '_1'] = neigh1[0].ravel()
+            
+            # FINDING LABELS
+            db_datafusion_rasar_test[endpoint+ '_' + effect + '_label'] = db_mortality_test.apply(lambda x: find_similar_exp(
+                x, db_endpoint[db_endpoint.effect == effect], comparing), axis = 1).reset_index(drop = True)
+            
             
     return db_datafusion_rasar_train, db_datafusion_rasar_test
 
@@ -345,10 +390,10 @@ def cv_datafusion_rasar(X, y, db_datafusion):
     se_specs = sem(specs)
     
     print('''Accuracy: \t {}, se: {}
-    RMSE: \t\t {}, se: {}
-    Sensitivity: \t {}, se: {}
-    Precision: \t\t {}, se: {}
-    Specificity: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_sens, se_sens,
+RMSE: \t\t {}, se: {}
+Sensitivity: \t {}, se: {}
+Precision: \t\t {}, se: {}
+Specificity: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_sens, se_sens,
                                      avg_precs, se_precs, avg_specs, se_specs))
     
     
