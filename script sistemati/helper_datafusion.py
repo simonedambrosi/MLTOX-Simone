@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import ctime
 from math import sqrt
-
+from collections import Counter
 from general_helper import multiclass_encoding
 
 from sklearn.preprocessing import OrdinalEncoder
@@ -80,32 +80,12 @@ def encoding_categorical(cat_cols, database, database_df):
     
     return database, database_df
 
+
 def find_similar_exp(exp_mortality, db_datafusion, compare_features):
-      
-    sim_exp = (db_datafusion[compare_features] == exp_mortality[compare_features]).all(axis = 1)
-    out = db_datafusion.conc1_mean[sim_exp].index.tolist()
-    
-    if len(out) != 0:
-        
-        if len(out) == 1:
-            if db_datafusion.conc1_mean[sim_exp].values[0] == 0:
-                return -1
-            else:
-                return 1
-        
-        else:
-            if len(out)%2 == 0:
-                if db_datafusion.conc1_mean[sim_exp].values[0] == 0:
-                    return -1
-                else:
-                    return 1
-                
-            else:
-                if db_datafusion.conc1_mean[sim_exp].value_counts().index[0] == 0:
-                    return -1
-                else:
-                    return 1
-    else:
+    out = db_datafusion.conc1_mean[(db_datafusion[compare_features] == exp_mortality[compare_features]).all(axis = 1)].values
+    try:
+        return -1 if Counter(out).most_common(1)[0][0] == 0 else 1
+    except:
         return 0
 
 
@@ -145,10 +125,6 @@ def euc_ham_pub_matrix(X, num_features, cat_features, a_ham, a_pub):
 
 
 
-
-
-
-
 def right_neighbor(neighbors, X_train, y_train, y_check):
     # IDX Neighbors
     idx_neigh_0 = pd.DataFrame(neighbors[1])[0].apply(lambda x: X_train.iloc[y_train==y_check].iloc[x].name)
@@ -183,6 +159,7 @@ def unsuper_simple_rasar(train_distance_matrix, test_distance_matrix, X_train, X
     # To find neighbors for test experiments --> df_rasar_test
     dist_matr_test_train_0 = test_distance_matrix.iloc[:, y_train == 0]
     dist_matr_test_train_1 = test_distance_matrix.iloc[:, y_train == 1]
+    
     
     ####### DF train RASAR ###############
     
@@ -322,9 +299,6 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
             
     return db_datafusion_rasar_train, db_datafusion_rasar_test
 
-
-
-
 def cv_datafusion_rasar(X, y, db_datafusion):
     categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
            'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
@@ -398,3 +372,140 @@ Specificity: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_s
     
     
     return avg_accs, se_accs, avg_rmse, se_rmse
+
+
+def cv_depth_datafusion_rasar(X, y, db_datafusion, max_depth_list = []):
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+    output_train_acc = dict()
+    output_train_rmse = dict()
+    output_test_acc = dict()
+    output_test_rmse = dict()
+    
+    for md in max_depth_list:
+        output_train_acc[md] = list()
+        output_train_rmse[md] = list()
+        output_test_acc[md] = list()
+        output_test_rmse[md] = list()
+    
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
+                               a_ham = 0.009473684210526315, a_pub = 0.007105263157894737)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    
+    for train_index, test_index in kf.split(distance_matrix):
+        
+        
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        simple_rasar_train, simple_rasar_test = unsuper_simple_rasar(dist_matr_train, dist_matr_test, X.iloc[train_index],
+                                                                     X.iloc[test_index], y_train, y_test)
+        
+        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar(X.iloc[train_index], X.iloc[test_index],
+                                                                                 db_datafusion)
+                
+        train_rf = pd.concat([simple_rasar_train[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_train], axis = 1)
+        test_rf = pd.concat([simple_rasar_test[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_test], axis = 1)
+        
+        print('Train and test done... models...', end = '')
+        
+        for md in max_depth_list:
+            rfc = RandomForestClassifier(n_estimators = 300, max_depth = md, n_jobs = -1)
+            rfc.fit(train_rf, y_train)
+            y_train_pred = rfc.predict(train_rf)
+            y_test_pred = rfc.predict(test_rf)
+            
+            output_train_acc[md].append(accuracy_score(y_train, y_train_pred))
+            output_train_rmse[md].append(sqrt(mean_squared_error(y_train, y_train_pred)))
+            
+            output_test_acc[md].append(accuracy_score(y_test, y_test_pred))
+            output_test_rmse[md].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+        
+        print('done')
+        
+    print('...END CV', ctime())
+    
+    return output_train_acc, output_train_rmse, output_test_acc, output_test_rmse
+
+
+########################################################################################################################
+
+def cv_random_datafusion_rasar(X, y, db_datafusion, params = dict()):
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+    output_train_acc = dict()
+    output_train_rmse = dict()
+    output_test_acc = dict()
+    output_test_rmse = dict()
+    
+    for md in max_depth_list:
+        output_train_acc[md] = list()
+        output_train_rmse[md] = list()
+        output_test_acc[md] = list()
+        output_test_rmse[md] = list()
+    
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
+                               a_ham = 0.009473684210526315, a_pub = 0.007105263157894737)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    
+    for train_index, test_index in kf.split(distance_matrix):
+        
+        
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        simple_rasar_train, simple_rasar_test = unsuper_simple_rasar(dist_matr_train, dist_matr_test, X.iloc[train_index],
+                                                                     X.iloc[test_index], y_train, y_test)
+        
+        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar(X.iloc[train_index], X.iloc[test_index],
+                                                                                 db_datafusion)
+                
+        train_rf = pd.concat([simple_rasar_train[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_train], axis = 1)
+        test_rf = pd.concat([simple_rasar_test[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_test], axis = 1)
+        
+        print('Train and test done... models...', end = '')
+        
+        
+            
+        rfc = RandomForestClassifier(n_jobs = -1)
+        rfc.fit(train_rf, y_train)
+        y_train_pred = rfc.predict(train_rf)
+        y_test_pred = rfc.predict(test_rf)
+
+
+
+
+        output_train_acc[md].append(accuracy_score(y_train, y_train_pred))
+        output_train_rmse[md].append(sqrt(mean_squared_error(y_train, y_train_pred)))
+
+        output_test_acc[md].append(accuracy_score(y_test, y_test_pred))
+        output_test_rmse[md].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+
+        print('done')
+        
+    print('...END CV', ctime())
+    
+    return output_train_acc, output_train_rmse, output_test_acc, output_test_rmse
+
+
+
