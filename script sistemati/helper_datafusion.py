@@ -17,6 +17,8 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import KFold
+from sklearn.model_selection import ParameterSampler
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import recall_score, confusion_matrix, precision_score, accuracy_score, mean_squared_error
 
@@ -299,7 +301,7 @@ def unsuper_datafusion_rasar(db_mortality_train, db_mortality_test, db_datafusio
             
     return db_datafusion_rasar_train, db_datafusion_rasar_test
 
-def cv_datafusion_rasar(X, y, db_datafusion):
+def cv_datafusion_rasar(X, y, db_datafusion, params = {}):
     categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
            'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
 
@@ -326,6 +328,7 @@ def cv_datafusion_rasar(X, y, db_datafusion):
         y_train = y[train_index]
         y_test = y[test_index]
         
+        print('Train and test...', end = '')
         simple_rasar_train, simple_rasar_test = unsuper_simple_rasar(dist_matr_train, dist_matr_test, X.iloc[train_index],
                                                                      X.iloc[test_index], y_train, y_test)
         
@@ -334,7 +337,15 @@ def cv_datafusion_rasar(X, y, db_datafusion):
         train_rf = pd.concat([simple_rasar_train[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_train], axis = 1)
         test_rf = pd.concat([simple_rasar_test[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_test], axis = 1)
         
-        rfc = RandomForestClassifier(n_estimators = 300, n_jobs = -2)
+        print('done... model...', end ='')
+        
+        if params == {}:
+            rfc = RandomForestClassifier(n_estimators = 300, n_jobs = -2)
+        else:
+            rfc = RandomForestClassifier(n_jobs = -1)
+            for k,v in params.items():
+                setattr(rfc, k, v)
+        
         rfc.fit(train_rf, y_train)
         y_pred = rfc.predict(test_rf)
         
@@ -345,6 +356,8 @@ def cv_datafusion_rasar(X, y, db_datafusion):
         sens.append(recall_score(y_test, y_pred))
         precs.append(precision_score(y_test, y_pred))
         specs.append(tn/(tn+fp))
+        
+        print('done')
         
     print('...END DataFusion RASAR', ctime())
     
@@ -366,7 +379,7 @@ def cv_datafusion_rasar(X, y, db_datafusion):
     print('''Accuracy: \t {}, se: {}
 RMSE: \t\t {}, se: {}
 Sensitivity: \t {}, se: {}
-Precision: \t\t {}, se: {}
+Precision: \t {}, se: {}
 Specificity: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_sens, se_sens,
                                      avg_precs, se_precs, avg_specs, se_specs))
     
@@ -440,23 +453,25 @@ def cv_depth_datafusion_rasar(X, y, db_datafusion, max_depth_list = []):
 
 ########################################################################################################################
 
-def cv_random_datafusion_rasar(X, y, db_datafusion, params = dict()):
+def cv_random_datafusion_rasar(X, y, db_datafusion, params_dict = dict(), n_models = 100, seed = 42):
     categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
            'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
 
     non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
                    'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
     
+    params_comb = list(ParameterSampler(params_dict, n_iter = n_models, random_state = seed))
+    
     output_train_acc = dict()
     output_train_rmse = dict()
     output_test_acc = dict()
     output_test_rmse = dict()
-    
-    for md in max_depth_list:
-        output_train_acc[md] = list()
-        output_train_rmse[md] = list()
-        output_test_acc[md] = list()
-        output_test_rmse[md] = list()
+
+    for i in range(0,len(params_comb)):
+        output_train_acc['mod' + str(i)] = list()
+        output_train_rmse['mod' + str(i)] = list()
+        output_test_acc['mod' + str(i)] = list()
+        output_test_rmse['mod' + str(i)] = list()
     
     print('Computing distance matrix...', ctime())
     distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
@@ -477,35 +492,35 @@ def cv_random_datafusion_rasar(X, y, db_datafusion, params = dict()):
         simple_rasar_train, simple_rasar_test = unsuper_simple_rasar(dist_matr_train, dist_matr_test, X.iloc[train_index],
                                                                      X.iloc[test_index], y_train, y_test)
         
-        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar(X.iloc[train_index], X.iloc[test_index],
-                                                                                 db_datafusion)
+        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar(X.iloc[train_index], X.iloc[test_index], db_datafusion)
                 
         train_rf = pd.concat([simple_rasar_train[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_train], axis = 1)
         test_rf = pd.concat([simple_rasar_test[['dist_neigh0', 'dist_neigh1']], datafusion_rasar_test], axis = 1)
         
         print('Train and test done... models...', end = '')
         
-        
+        for i in range(0, len(params_comb)):
             
-        rfc = RandomForestClassifier(n_jobs = -1)
-        rfc.fit(train_rf, y_train)
-        y_train_pred = rfc.predict(train_rf)
-        y_test_pred = rfc.predict(test_rf)
+            rfc = RandomForestClassifier(n_jobs = -1)
+        
+            for k,v in params_comb[i].items():
+                setattr(rfc, k, v)
+            
+            rfc.fit(train_rf, y_train)
+            y_train_pred = rfc.predict(train_rf)
+            y_test_pred = rfc.predict(test_rf)
 
+            output_train_acc['mod' + str(i)].append(accuracy_score(y_train, y_train_pred))
+            output_train_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_train, y_train_pred)))
 
-
-
-        output_train_acc[md].append(accuracy_score(y_train, y_train_pred))
-        output_train_rmse[md].append(sqrt(mean_squared_error(y_train, y_train_pred)))
-
-        output_test_acc[md].append(accuracy_score(y_test, y_test_pred))
-        output_test_rmse[md].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+            output_test_acc['mod' + str(i)].append(accuracy_score(y_test, y_test_pred))
+            output_test_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_test, y_test_pred)))
 
         print('done')
         
     print('...END CV', ctime())
     
-    return output_train_acc, output_train_rmse, output_test_acc, output_test_rmse
+    return params_comb, output_train_acc, output_train_rmse, output_test_acc, output_test_rmse
 
 
 
