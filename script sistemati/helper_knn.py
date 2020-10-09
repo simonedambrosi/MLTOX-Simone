@@ -497,12 +497,8 @@ def cv_multiclass_knn(X, y, a_ham, a_pub, k, leaf_size):
     kf = KFold(n_splits=5, shuffle=True, random_state = 5645)
     accs = []
     rmse = []
-    
-    
-    
-    
-    
-    
+    wrecs = []
+    wprecs = []
     for train_index, test_index in kf.split(dist_matr):
 
         X_train = dist_matr.iloc[train_index, train_index]
@@ -519,12 +515,9 @@ def cv_multiclass_knn(X, y, a_ham, a_pub, k, leaf_size):
 
         accs.append(accuracy_score(y_test, y_pred))
         rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+        wrecs.append(recall_score(y_test, y_pred, average = 'weighted'))
+        wprecs.append(precision_score(y_test, y_pred, average = 'weighted'))
         
-        
-        
-        
-        
-
         del X_train, X_test, y_train, y_test
 
     avg_acc = np.mean(accs)
@@ -533,13 +526,16 @@ def cv_multiclass_knn(X, y, a_ham, a_pub, k, leaf_size):
     avg_rmse = np.mean(rmse)
     se_rmse = sem(rmse)
 
+    avg_wrecs = np.mean(wrecs)
+    se_wrecs = sem(wrecs)
     
+    avg_wprecs = np.mean(wprecs)
+    se_wprecs = sem(wprecs)
     
-    
-    
-
     print('''Accuracy: \t {}, se: {}
-RMSE: \t\t {}, se: {}'''.format(avg_acc, se_acc, avg_rmse, se_rmse))
+RMSE: \t\t {}, se: {}
+W. Recall: \t {}, se:{}
+W. Precision: \t {}, se: {}'''.format(avg_acc, se_acc, avg_rmse, se_rmse, avg_wrecs, se_wrecs, avg_wprecs, se_wprecs))
     return
 
 

@@ -84,18 +84,18 @@ def df_to_newick(dataframe):
     
     return new_tree
 
-def multiclass_encoding(var):
+def multiclass_encoding(var, threshold = [10**-1, 10**0, 10**1, 10**2]):
     for i in range(0,len(var)):
-        if var[i] <= 10**-1:
+        if var[i] <= threshold[0]:
             var[i] = 5
         
-        elif 10**-1 < var[i] <= 10**0:
+        elif threshold[0] < var[i] <= threshold[1]:
             var[i] = 4
         
-        elif 10**0 < var[i] <= 10**1:
+        elif threshold[1] < var[i] <= threshold[2]:
             var[i] = 3
             
-        elif 10**1 < var[i] <= 10**2:
+        elif threshold[2] < var[i] <= threshold[3]:
             var[i] = 2
             
         else:
