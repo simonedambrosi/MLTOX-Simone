@@ -10,7 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import ctime
 from math import sqrt
+import math
 from collections import Counter
+import itertools
 
 from general_helper import multiclass_encoding
 
@@ -18,6 +20,7 @@ from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler
 from sklearn.model_selection import KFold, ParameterSampler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import recall_score, confusion_matrix, precision_score, accuracy_score, mean_squared_error
 
 from scipy.spatial.distance import cdist, pdist, squareform
@@ -25,6 +28,7 @@ from scipy.stats import sem
 
 import h2o
 from h2o.estimators import H2ORandomForestEstimator
+from h2o.grid.grid_search import H2OGridSearch
 
 ###############################################################################################
 ####################################  LOADING AND ENCODING ####################################
@@ -85,7 +89,8 @@ def load_datafusion_datasets(DATA_MORTALITY_PATH, DATA_OTHER_ENDPOINT_PATH, enco
             db_datafusion.loc[db_datafusion.effect == ef, 'conc1_mean'] = np.where(conc > np.median(conc), 1, 0)
             
     elif encoding == 'multiclass':
-        h2o.init()
+#         h2o.init()
+#         h2o.no_progress() # disable progress bar during model fitting
         t = db_mortality['conc1_mean'].copy()
         db_mortality['conc1_mean'] = multiclass_encoding(t)
         
@@ -223,8 +228,8 @@ def unsuper_datafusion_rasar_multiclass(db_mortality_train, db_mortality_test, d
     comparing = ['test_cas', 'obs_duration_mean', 'conc1_type', 'exposure_type', 'control_type', 'media_type',
              'application_freq_unit', 'class', 'tax_order', 'family', 'genus', 'species']
     
-    db_datafusion_train = pd.DataFrame()
-    db_datafusion_test = pd.DataFrame()
+    db_datafusion_rasar_train = pd.DataFrame()
+    db_datafusion_rasar_test = pd.DataFrame()
     
     for endpoint in db_datafusion.endpoint.unique():
         
@@ -251,7 +256,7 @@ def unsuper_datafusion_rasar_multiclass(db_mortality_train, db_mortality_test, d
             
                 neigh_train_i = knn.kneighbors(matr_trainmor_trainfus_i, return_distance = True)
                                 
-                db_datafusion_train[endpoint + '_' + effect + '_'+ str(i)] = neigh_train_i[0].ravel()
+                db_datafusion_rasar_train[endpoint + '_' + effect + '_'+ str(i)] = neigh_train_i[0].ravel()
                 
                 ##########################
                 ######## DF RASAR -- TEST
@@ -262,7 +267,7 @@ def unsuper_datafusion_rasar_multiclass(db_mortality_train, db_mortality_test, d
             
                 neigh_test_i = knn.kneighbors(matr_testmor_trainfus_i, return_distance = True)
                 
-                db_datafusion_test[endpoint + '_' + effect + '_' + str(i)] = neigh_test_i[0].ravel()
+                db_datafusion_rasar_test[endpoint + '_' + effect + '_' + str(i)] = neigh_test_i[0].ravel()
                 
                 
             db_datafusion_rasar_train[endpoint+ '_' + effect + '_label'] = db_mortality_train.apply(
@@ -273,7 +278,7 @@ def unsuper_datafusion_rasar_multiclass(db_mortality_train, db_mortality_test, d
                 lambda x: find_similar_exp_multiclass(x, db_endpoint[db_endpoint.effect == effect], comparing),
                 axis = 1).reset_index(drop = True)
     
-    return db_datafusion_train, db_datafusion_test
+    return db_datafusion_rasar_train, db_datafusion_rasar_test
 
 
 
@@ -333,9 +338,10 @@ def cv_datafusion_rasar_multiclass(X, y, db_datafusion, final_model = False):
         if not final_model:
             rfc = H2ORandomForestEstimator(categorical_encoding = 'one_hot_explicit', seed = 123)
         else:
-            ### TO DO TO DO TO DO TO DO ### ### ### ### ### ### ### ### ### ###  TO DO  TO DO  TO DO TO DO TO DO TO DO TO DO
-            rfc = H2ORandomForestEstimator() ### TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO
-            ### TO DO TO DO TO DO TO DO ### ### ### ### ### ### ### ### ### ### TO DO TO DO TO DO TO DO TO DO TO DO
+            # parameters are cross-validated...
+            rfc = H2ORandomForestEstimator(ntrees = 500, sample_rate = 0.6, nbins_cats = 4096, nbins = 64, min_rows = 1,
+                                           max_depth = 17, min_split_improvement = 0.0001, histogram_type = 'QuantilesGlobal',
+                                           col_sample_rate_per_tree = 0.83, categorical_encoding = 'one_hot_explicit', seed = 123)
                 
         rfc.train(y = 'target', training_frame = train_rf_h2o)
         y_pred = rfc.predict(test_rf_h2o).as_data_frame()['predict']
@@ -368,6 +374,367 @@ W. Precision: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_
                                      avg_wprecs, se_wprecs))
     
     return
+
+
+def cv_depth_datafusion_rasar_multiclass(X, y, db_datafusion, max_depth_list = list()):
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+    output_train_acc = dict()
+    output_train_rmse = dict()
+    output_test_acc = dict()
+    output_test_rmse = dict()
+    
+    for md in max_depth_list:
+        output_train_acc[md] = list()
+        output_train_rmse[md] = list()
+        output_test_acc[md] = list()
+        output_test_rmse[md] = list()
+    
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, a_ham = 2.7825594022071245, a_pub = 1000)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    accs = []
+    rmse = []
+    wrecs = []
+    wprecs = []
+    for train_index, test_index in kf.split(distance_matrix):
+        
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        print('Train and test...', ctime(), end = '')
+        simple_rasar_train, simple_rasar_test = unsuper_simple_rasar_multiclass(dist_matr_train, dist_matr_test, X.iloc[train_index], 
+                                                                                X.iloc[test_index], y_train, y_test)
+        
+        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar_multiclass(X.iloc[train_index], X.iloc[test_index], 
+                                                                                            db_datafusion, 
+                                                                                            alpha_1 = 2.7825594022071245, alpha_3 = 1000)
+        
+        train_rf = pd.concat([simple_rasar_train, datafusion_rasar_train], axis = 1)
+        test_rf = pd.concat([simple_rasar_test, datafusion_rasar_test], axis = 1)
+        
+        train_rf.loc[:, 'target'] = y_train
+        test_rf.loc[:, 'target'] = y_test
+        
+        train_rf_h2o = h2o.H2OFrame(train_rf)
+        test_rf_h2o = h2o.H2OFrame(test_rf)
+        
+        for col in train_rf.columns:
+            if 'label' in col:
+                train_rf_h2o[col] = train_rf_h2o[col].asfactor()
+                test_rf_h2o[col] = test_rf_h2o[col].asfactor()
+        
+        train_rf_h2o['target'] = train_rf_h2o['target'].asfactor()
+        test_rf_h2o['target'] = test_rf_h2o['target'].asfactor()
+        
+        print('done... models...', ctime(), end = '')
+    
+        drf_grid = H2ORandomForestEstimator(max_runtime_secs = 3600, seed = 123, stopping_rounds = 5,
+                                    stopping_metric = "RMSE", stopping_tolerance = 1e-4,
+                                    categorical_encoding = 'onehotexplicit')
+        
+        hyper_params = {'max_depth': max_depth_list}
+        
+        # grid search
+        grid = H2OGridSearch(drf_grid, hyper_params, search_criteria = {'strategy': "Cartesian"})
+        grid.train(y = 'target' , training_frame = train_rf_h2o)
+        
+        sorted_grid = grid.get_grid(sort_by = 'rmse', decreasing = True)
+        
+        for i in range(0, len(max_depth_list)):
+            model = h2o.get_model(sorted_grid.sorted_metric_table()['model_ids'][i])
+            y_train_pred = model.predict(train_rf_h2o).as_data_frame()['predict'].round()
+            y_test_pred = model.predict(test_rf_h2o).as_data_frame()['predict'].round()
+            
+            output_train_acc[model.actual_params['max_depth']].append(accuracy_score(y_train, y_train_pred))
+            output_train_rmse[model.actual_params['max_depth']].append(sqrt(mean_squared_error(y_train, y_train_pred)))
+    
+            output_test_acc[model.actual_params['max_depth']].append(accuracy_score(y_test, y_test_pred))
+            output_test_rmse[model.actual_params['max_depth']].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+        
+        h2o.remove_all()
+    
+    print('...END CV', ctime())
+    
+    tab_depth_rasar = pd.DataFrame(columns = ['train_acc', 'test_acc', 'train_rmse', 'test_rmse'])
+
+    tab_depth_rasar.loc[:,'train_acc'] = pd.DataFrame(output_train_acc).mean(axis = 0)
+    tab_depth_rasar.loc[:,'test_acc'] = pd.DataFrame(output_test_acc).mean(axis = 0)
+    tab_depth_rasar.loc[:,'train_rmse'] = pd.DataFrame(output_train_rmse).mean(axis = 0)
+    tab_depth_rasar.loc[:,'test_rmse'] = pd.DataFrame(output_test_rmse).mean(axis = 0)
+    
+    tab_depth_rasar = tab_depth_rasar.reset_index().rename(columns = {'index': 'max_depth'})
+    
+    return tab_depth_rasar
+
+
+def cv_random_datafusion_rasar_multiclass(X, y, db_datafusion, params_dict = dict(), n_models = 100, seed = 42):
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+      
+    params_comb = list(ParameterSampler(params_dict, n_iter = n_models, random_state = seed))
+    
+    output_train_acc = dict()
+    output_train_rmse = dict()
+    output_test_acc = dict()
+    output_test_rmse = dict()
+
+    for i in range(0,len(params_comb)):
+        output_train_acc['mod' + str(i)] = list()
+        output_train_rmse['mod' + str(i)] = list()
+        output_test_acc['mod' + str(i)] = list()
+        output_test_rmse['mod' + str(i)] = list()
+    
+
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, a_ham = 2.7825594022071245, a_pub = 1000)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    accs = []
+    rmse = []
+    wrecs = []
+    wprecs = []
+    for train_index, test_index in kf.split(distance_matrix):
+        
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        print('Train and test...', ctime(), end = '')
+        simple_rasar_train, simple_rasar_test = unsuper_simple_rasar_multiclass(dist_matr_train, dist_matr_test, X.iloc[train_index], 
+                                                                                X.iloc[test_index], y_train, y_test)
+        
+        datafusion_rasar_train, datafusion_rasar_test = unsuper_datafusion_rasar_multiclass(X.iloc[train_index], X.iloc[test_index], 
+                                                                                            db_datafusion, 
+                                                                                            alpha_1 = 2.7825594022071245, alpha_3 = 1000)
+        
+        train_rf = pd.concat([simple_rasar_train, datafusion_rasar_train], axis = 1)
+        test_rf = pd.concat([simple_rasar_test, datafusion_rasar_test], axis = 1)
+        
+        train_rf.loc[:, 'target'] = y_train
+        test_rf.loc[:, 'target'] = y_test
+        
+        train_rf_h2o = h2o.H2OFrame(train_rf)
+        test_rf_h2o = h2o.H2OFrame(test_rf)
+        
+        for col in train_rf.columns:
+            if 'label' in col:
+                train_rf_h2o[col] = train_rf_h2o[col].asfactor()
+                test_rf_h2o[col] = test_rf_h2o[col].asfactor()
+        
+        train_rf_h2o['target'] = train_rf_h2o['target'].asfactor()
+        test_rf_h2o['target'] = test_rf_h2o['target'].asfactor()
+        
+        print('done... models...', ctime(), end = '')
+    
+        for i in range(0, len(params_comb)):
+            
+            drf = H2ORandomForestEstimator(max_runtime_secs = 3600, seed = 123,
+                                    stopping_metric = "RMSE", stopping_tolerance = 1e-4, stopping_rounds = 5,
+                                    categorical_encoding = 'onehotexplicit')
+            
+            for k,v in params_comb[i].items():
+                setattr(drf, k, v)
+            
+            drf.train(y = 'target', training_frame = train_rf_h2o)
+            
+            y_train_pred = drf.predict(train_rf_h2o).as_data_frame()['predict'].round()
+            y_test_pred = drf.predict(test_rf_h2o).as_data_frame()['predict'].round()
+            
+            output_train_acc['mod' + str(i)].append(accuracy_score(y_train, y_train_pred))
+            output_train_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_train, y_train_pred)))
+    
+            output_test_acc['mod' + str(i)].append(accuracy_score(y_test, y_test_pred))
+            output_test_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+        
+        h2o.remove_all()
+            
+        print('done')
+            
+    print('...END CV', ctime())
+    
+    tab_rasar_final = pd.DataFrame(columns = ['train_acc', 'test_acc', 'train_rmse', 'test_rmse'])
+
+    tab_rasar_final.loc[:,'train_acc'] = pd.DataFrame(output_train_acc).mean(axis = 0)
+    tab_rasar_final.loc[:,'test_acc'] = pd.DataFrame(output_test_acc).mean(axis = 0)
+    tab_rasar_final.loc[:,'train_rmse'] = pd.DataFrame(output_train_rmse).mean(axis = 0)
+    tab_rasar_final.loc[:,'test_rmse'] = pd.DataFrame(output_test_rmse).mean(axis = 0)
+    
+    params_df = pd.DataFrame(params_comb, index = ['mod' + str(i) for i in range(0, len(params_comb))])
+    tab_rasar_final = pd.concat([tab_rasar_final, params_df], axis = 1)
+    
+    return tab_rasar_final
+
+
+##########################################################################################################
+#################################  SIMPLE RASAR -- MULTICLASS  ###########################################
+##########################################################################################################
+
+def cv_simple_rasar_multiclass(X, y, final_model = False):
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
+                               a_ham = 2.7825594022071245, a_pub = 1000)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    accs = []
+    rmse = []
+    wrecs = []
+    wprecs = []
+    for train_index, test_index in kf.split(distance_matrix):
+
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        rasar_train, rasar_test = unsuper_simple_rasar_multiclass(dist_matr_train, dist_matr_test,
+                                                                  X.iloc[train_index], X.iloc[test_index], 
+                                                                  y_train, y_test)
+        if not final_model:
+            lrc = LogisticRegression(multi_class = 'multinomial', max_iter = 10000)
+        else:
+            lrc = LogisticRegression(multi_class = 'multinomial', max_iter = 20000, solver = 'saga', tol = 1e-5,
+                                     penalty = 'elasticnet', fit_intercept = False, l1_ratio = 0.6, n_jobs=-1)
+            
+        lrc.fit(rasar_train, y_train)
+        y_pred = lrc.predict(rasar_test)
+        
+        accs.append(accuracy_score(y_test, y_pred))
+        rmse.append(sqrt(mean_squared_error(y_test, y_pred)))
+        wrecs.append(recall_score(y_test, y_pred, average = 'weighted'))
+        wprecs.append(precision_score(y_test, y_pred, average = 'weighted'))
+        
+    print('...END Simple RASAR -- Multiclass', ctime())
+    
+    avg_accs = np.mean(accs)
+    se_accs = sem(accs)
+    
+    avg_rmse = np.mean(rmse)
+    se_rmse = sem(rmse)
+    
+    avg_wrecs = np.mean(wrecs)
+    se_wrecs = sem(wrecs)
+    
+    avg_wprecs = np.mean(wprecs)
+    se_wprecs = sem(wprecs)
+    
+    print('''Accuracy: \t {}, se: {}
+RMSE: \t\t {}, se: {}
+W. Recall: \t {}, se: {}
+W. Precision: \t {}, se: {}'''.format(avg_accs, se_accs, avg_rmse, se_rmse, avg_wrecs, se_wrecs,
+                                     avg_wprecs, se_wprecs))
+    
+    return
+
+
+def cv_random_simple_rasar_multiclass(X, y, params_dict, n_models = 132, seed = 42):
+    
+    categorical = ['class', 'tax_order', 'family', 'genus', "species", 'control_type', 'media_type',
+           'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
+
+    non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    
+      
+    params_comb = list(ParameterSampler(params_dict, n_iter = n_models, random_state = seed))
+    
+    output_train_acc = dict()
+    output_train_rmse = dict()
+    output_test_acc = dict()
+    output_test_rmse = dict()
+
+    for i in range(0,len(params_comb)):
+        output_train_acc['mod' + str(i)] = list()
+        output_train_rmse['mod' + str(i)] = list()
+        output_test_acc['mod' + str(i)] = list()
+        output_test_rmse['mod' + str(i)] = list()
+    
+    print('Computing distance matrix...', ctime())
+    distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
+                               a_ham = 2.7825594022071245, a_pub = 1000)
+    distance_matrix = pd.DataFrame(distance_matrix)
+    
+    print('Start CV...', ctime())
+    kf = KFold(n_splits=5, shuffle=True)
+    accs = []
+    rmse = []
+    for train_index, test_index in kf.split(distance_matrix):
+
+        dist_matr_train = distance_matrix.iloc[train_index,train_index]
+        dist_matr_test = distance_matrix.iloc[test_index,train_index]
+        y_train = y[train_index]
+        y_test = y[test_index]
+        
+        print('Train and test...', ctime(), end = '')
+        
+        rasar_train, rasar_test = unsuper_simple_rasar_multiclass(dist_matr_train, dist_matr_test,
+                                                                  X.iloc[train_index], X.iloc[test_index], 
+                                                                  y_train, y_test)
+        
+        print('done... models...', ctime(), end = '')
+        
+        for i in range(0, len(params_comb)):
+            
+            lrc = LogisticRegression(n_jobs = -1, penalty = 'elasticnet', solver = 'saga', max_iter = 10000)
+        
+            for k,v in params_comb[i].items():
+                setattr(lrc, k, v)
+            
+            lrc.fit(rasar_train, y_train)
+            y_train_pred = lrc.predict(rasar_train)
+            y_test_pred = lrc.predict(rasar_test)
+
+            output_train_acc['mod' + str(i)].append(accuracy_score(y_train, y_train_pred))
+            output_train_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_train, y_train_pred)))
+
+            output_test_acc['mod' + str(i)].append(accuracy_score(y_test, y_test_pred))
+            output_test_rmse['mod' + str(i)].append(sqrt(mean_squared_error(y_test, y_test_pred)))
+        
+        print('done')
+        
+    print('...END Simple RASAR -- Multiclass', ctime())
+    
+    tab_rasar_final = pd.DataFrame(columns = ['train_acc', 'test_acc', 'train_rmse', 'test_rmse'])
+
+    tab_rasar_final.loc[:,'train_acc'] = pd.DataFrame(output_train_acc).mean(axis = 0)
+    tab_rasar_final.loc[:,'test_acc'] = pd.DataFrame(output_test_acc).mean(axis = 0)
+    tab_rasar_final.loc[:,'train_rmse'] = pd.DataFrame(output_train_rmse).mean(axis = 0)
+    tab_rasar_final.loc[:,'test_rmse'] = pd.DataFrame(output_test_rmse).mean(axis = 0)
+    
+    params_df = pd.DataFrame(params_comb, index = ['mod' + str(i) for i in range(0, len(params_comb))])
+    tab_rasar_final = pd.concat([tab_rasar_final, params_df], axis = 1)
+    
+    return tab_rasar_final
+
+
+
+
+
+
 
 
 

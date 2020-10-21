@@ -1,0 +1,34 @@
+0) Abstract
+Questo lo scrivi per ultimo. Mi immagino che l'abstract dovrai anche scriverlo in italiano, e consegnarlo in segreteria.
+1) Introduzione
+- Presentazione qualitativa del problema dei tests tossicologici
+- Approcci anteriori (su dati non acquatici)
+- Quello che faremo noi
+   -- estrazione dei dati
+   -- applicare 3 modelli
+   -- interpretazione delle features
+2) I Dati
+- Descrizione del tipo di dati (specie, agenti chimici dal CAS al pubchem, endpoints, come vengono fatti gli esperimenti, ...)
+- La formulazione del problema (regressione, classificazione binaria, classificazione multiclass)
+- La questione degli esperimenti ripetuti, mostrare che i dati non sono buoni per la regressione.
+- Descrizione intuitiva del dataset (vari alberi, grafi etc. che hai generato) per far capire al lettore quali sono i limiti del dataset
+- Distanze tra composti
+3) Random Forests
+- Descrizione delle Random Forests e perché non funzionano bene con one-hot encoding
+- Descrizione algoritmo h2o
+- Hyperparameter tuning e risultati
+4) K-NN
+- Descrizione K-NN
+- Matrici di distanza e parametri alpha
+- Hyperparameter tuning e risultati
+5) RASAR (lo state of the art per questo tipo di dati)
+- Descrizione Simple RASAR e Data Fusion RASAR (vedi anche le nuove note dell'overleaf)
+- Hyperparameter tuning e risultati
+6) Feature importance
+- Mostrare quali sono i fingerprints più rilevanti. Probabilmente sarà necessario descrivere il processo fisico del logP.
+7) Conclusioni
+- Tabellone finale con le performance, e le performance normalizzate con gli esperimenti ripetuti
+- Discussione sulle performance
+- Paragone di RASAR con altri modelli
+- Discussione su dataset e applicabilità dei modelli
+- Discussione della feature importance (troviamo risultati compatibili con le attese dei chimici).
