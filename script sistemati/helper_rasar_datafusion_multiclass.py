@@ -614,6 +614,9 @@ def cv_simple_rasar_multiclass(X, y, final_model = False):
         rasar_train, rasar_test = unsuper_simple_rasar_multiclass(dist_matr_train, dist_matr_test,
                                                                   X.iloc[train_index], X.iloc[test_index], 
                                                                   y_train, y_test)
+        
+        
+        
         if not final_model:
             lrc = LogisticRegression(multi_class = 'multinomial', max_iter = 10000)
         else:

@@ -1,0 +1,108 @@
+X--Grafi con distanze. pip install py2neo
+
+Distanze tra specie (numero di segmenti dall'albero)
+istogramma distanze.
+
+https://zoom.us/j/96740039496
+
+##################################
+
+Correlazione tra le due misure di distanza
+tenere traccia dei composti a cui si riferiscono le distanze FATTO
+
+lista dei composti senza smiles o pubchem2d ### FATTO
+Ho generato 3 file csv che mi dicono quali sono i composti senza pubchem o smiles o entrambi.
+
+Iniziare a fare modelli:
+Random Forest(attenzione a variabili categoriche) --> h2o
+Knn con diverse matrici di distanze
+pensare a come combinarle
+
+##################################
+
+Ingradire istogramma (log) tanimoto in 0 --> FATTO... in Clustering -- Hamming e Tanimoto
+
+Fare esempio di albero che si riunisce nelle specie-- FATTO
+
+Clustering specie (contare rami)--> matrice a blocchi 
+(relativizzare con massima distanza oppure fare l'inverso della distanza)
+
+Mettere insieme genus e species e rifare albero -- FATTO
+
+Iniziare a fare modelli:
+Random Forest(attenzione a variabili categoriche) --> h2o --> dovrebbe fare qualisasi modello ad albero su one-hot encoding.
+**Se RF non funzionano vedere in composti che sbaglia e guardare l'assegnazione ai cluster**
+Knn con diverse matrici di distanze
+pensare a come combinarle (ancora da pensare)
+
+###################################
+
+tra i composti con hamming 0 vedere se anche tanimoto è 0
+
+cercare di far venire a blocchi la matrice delle distanze dele specie (bassissima priorità)
+
+modelli ad albero su one-hot fino a dove riesco solo con caratteristiche dei composti.
+Modo di implementare la distanza dei composti e delle specie in h2o nei modelli. (chiedere a Brutti)
+
+1) ripetere esperimenti con h2o con var continue
+2) modelli ad albero con h2o, con le variabili one-hot 
+3) one-hot e continue
+
+come funziona lo splitting in h2o diversamente da sklearn
+
+problemi possibili: troppe features--> togliere la parte di albero filogenetico delle specie
+cercare approcci non one-hot che permette di ridurre la dimensionalità (var categoriche)
+
+########################
+
+Fare diversi encoding per le variabili categoriche
+Vedere KNN come implementarlo
+
+Fare Random forest + grid search FATTO
+multiclasse (soglie lavoro precedente) FATTO-POCO 
+only chemicals per vedere importanza rispetto agli animali --> Fatto, controllare risultati, tabella?
+TOGLIERE CAS DA TUTTO --- FATTO
+modo per includere le distanze
+Data cleaning--> ricreazione del dataset per esperimenti ripetuti (occhio data leakage)
+
+
+#########################
+Trucchetto--> dimezzare il numero di alberi per vedere quanto si degrada il modello
+
+test error su gradient boosting e autoML -- vedere script first model H2O chunk AUTOML
+
+quanto si degradano i modelli anche autoML da train a test + confrontone
+
+KNN con combinazione di tanimoto e hamming su pubchem2d --> unsupervised step RASAR
+riprendere lavoro precedente e aggiungere con alpha le due distanze (pre process) 
+
+########################
+
+Sito dove scaricare i dati: ***https://cfpub.epa.gov/ecotox/***
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
