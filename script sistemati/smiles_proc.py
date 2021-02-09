@@ -15,52 +15,52 @@ import pubchempy as pcp
 
 def atom_number(smile):
     '''
-	Given the Smile, this function counts the number of atoms for each chemical
+    Given the Smile, this function counts the number of atoms for each chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- number of atoms (int): number of atoms in the chemical
-	'''
+        - number of atoms (int): number of atoms in the chemical
+    '''
     return sum(1 for c in smile if c.isupper())
 
 def alone_atom_number(smile):
     '''
-	Given the Smile, this function counts the number of atoms, which are seperated from other atoms, in each chemical
+    Given the Smile, this function counts the number of atoms, which are seperated from other atoms, in each chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- number of separeted atoms (int): number of separeted atoms in the chemical 
-	''' 
+        - number of separeted atoms (int): number of separeted atoms in the chemical 
+    ''' 
     return smile.count('[') 
 
 def count_doubleBond(smile):
     '''
-	Given the smile, this function count the number of double bonds for each chemical
+    Given the smile, this function count the number of double bonds for each chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- number of double bonds (int): number of double bonds in the chemical 
-	'''
+        - number of double bonds (int): number of double bonds in the chemical 
+    '''
     return smile.count('=') 
 
 def count_tripleBond(smile):
     '''
-	Given the smile, this function count the number of triple bonds for each chemical
+    Given the smile, this function count the number of triple bonds for each chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- number of triple bonds (int): number of triple bonds in the chemical 
-	'''
+        - number of triple bonds (int): number of triple bonds in the chemical 
+    '''
     return smile.count('#') 
     
 def bonds_number(smile):
     '''
-	Given the smile, this function count the number of bonds for each chemical
+    Given the smile, this function count the number of bonds for each chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- bonds number (int): number of bonds in the chemical (NaN if not found)
-	'''
+        - bonds number (int): number of bonds in the chemical (NaN if not found)
+    '''
     m = Chem.MolFromSmiles(smile)
     try:
         return rdchem.Mol.GetNumBonds(m)
@@ -69,12 +69,12 @@ def bonds_number(smile):
     
 def ring_number(smile):
     '''
-	Given the smile, this function count the number of ring in each Chemical
+    Given the smile, this function count the number of ring in each Chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- ring_number (int): number of ring in the chemical (NaN if not found)
-	'''
+        - ring_number (int): number of ring in the chemical (NaN if not found)
+    '''
     m = Chem.MolFromSmiles(smile)
     try:
         f = rdchem.Mol.GetRingInfo(m)
@@ -83,13 +83,14 @@ def ring_number(smile):
         return 'NaN'
 
 def Mol(smile):
-# 	'''
-# 	Given the smile, this function compute the Mol for each Chemical
-#     Inputs:
-#         - smile (string): original SMILES code
-#     Outputs:
-# 		- Mol (float): mol number of the chemical (NaN if not found)
-# 	'''
+    '''
+    Given the smile, this function compute the Mol for each Chemical
+    Inputs:
+        - smile (string): original SMILES code
+    Outputs:
+        - Mol (float): mol number of the chemical (NaN if not found)
+    '''
+    
     smile = str(smile)
     try:
         m = Chem.MolFromSmiles(smile)
@@ -99,12 +100,12 @@ def Mol(smile):
     
 def MorganDensity(smile):
     '''
-	Given the Smile, this function compute the Morgan density for each Chemical
+    Given the Smile, this function compute the Morgan density for each Chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- Morgan Density (float): Morgan density of the chemical (NaN if not found)
-	'''
+        - Morgan Density (float): Morgan density of the chemical (NaN if not found)
+    '''
     smile = str(smile)
     m = Chem.MolFromSmiles(smile)
     try:
@@ -114,12 +115,12 @@ def MorganDensity(smile):
 
 def LogP(smile):
     '''
-	Given the Smile, this function compute the partition coefficient for each Chemical
+    Given the Smile, this function compute the partition coefficient for each Chemical
     Inputs:
         - smile (string): original SMILES code
     Outputs:
-		- LogP (float): partition coefficient of the chemical (NaN if not found)
-	'''
+        - LogP (float): partition coefficient of the chemical (NaN if not found)
+    '''
     smile = str(smile)
     try:
         m = Chem.MolFromSmiles(smile)
@@ -129,7 +130,11 @@ def LogP(smile):
 
 def OH_count(smile):
     '''
-    Given the SMILES, this function compute the number of OH group in the chemical
+    Given the SMILES, this function compute the number of OH group in the chemical.
+    Inputs:
+        - smiles (str)
+    Outputs:
+        - Count of OH group in the molecule (int) (NaN if not found)
     '''
     try:
         m = MolFromSmiles(smile)
@@ -140,23 +145,37 @@ def OH_count(smile):
         
 def to_cas(num):
     ''' 
-	Transform an integer CAS into a CAS Registry Number (format XXXXX-XX-X)
+    Transform an integer CAS into a CAS Registry Number (format XXXXX-XX-X)
     Inputs:
         - num (int): CAS in integer format
     Outputs:
-		- Cas_number (string): cas in format XXXXXX-XX-X
-	'''
+        - Cas_number (string): cas in format XXXXXX-XX-X
+    '''
     Cas_number = str(num)
     Cas_number = Cas_number[:-3]+ '-' + Cas_number[-3:-1] +'-' + Cas_number[-1]
     return Cas_number
 
 def find_pubchem(smiles):
+    '''
+    Find PubChem2D Fingerprint using PubchemPy
+    Inputs:
+        - smile (string): original SMILES code
+    Outputs:
+        - PubChem2D (string): pubchem2d fingerprint in string format (NaN if not found)
+    '''
     try:
         return pcp.get_compounds(smiles, 'smiles')[0].cactvs_fingerprint
     except:
         return 'NaN'
 
 def find_smiles(cas):
+    '''
+    Find SMILES representation using CirPy
+    Inputs:
+        - Cas_number (str): CAS number in original format
+    Outputs:
+        - SMILES (str): original SMILES code
+    '''
     return cirpy.resolve(cas, 'smiles')
 
 def adding_smiles_features(dataframe):
