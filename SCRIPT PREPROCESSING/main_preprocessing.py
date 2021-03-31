@@ -32,8 +32,6 @@ def load_process_data(DATA_PATH_TESTS, DATA_PATH_RESULTS, DATA_PATH_SPECIES):
     print('Dimension of final dataset:', final_db.shape[0], 'experiments and', final_db.shape[1], 'features')
     print('Final features:', [i for i in final_db.columns])
     
-    final_db.drop(columns = 'fish')
-    
 #   final_db.to_csv('lc_db_processed.csv')
 
     return final_db

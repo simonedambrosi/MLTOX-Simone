@@ -117,7 +117,7 @@ def prefilter(species, tests, results):
 
 #######################################################################################################################################
 # Step 3: Feature Selection and Imputation
-# Per decidere quali feature estrarre ho usato la funzione nel general_helper.py denominata "null_output_counts" che prendendo in input un pandas dataframe calcola la percentuale di valori nulli (Null, Not Available e Not Reported) e il numero di valori distinti che possono assumere.
+# Per decidere quali feature estrarre ho usato la funzione nel general_helper.py denominata "null_output_counts" che prendendo in input un pandas dataframe calcola la percentuale di valori nulli (Null, Not Available e Not Reported) e il numero di modalità che possono assumere.
 
 # Ho ristretto quindi alle sole features che avessero meno del 30% di valori nulli e più di 1 singola modalità. Se avessi imposto una percentuale di valori mancanti maggiore (50%) le features aggiuntive avrebbero dimezzato il dataset dopo l'eliminazione dei record con valori mancanti, riducendolo alla fine a troppe poche osservazioni. 
 # Imponendo, invece, il 30% come soglia si ottiene un quantitativo di informazione sufficiente.
@@ -338,11 +338,11 @@ def repeated_experiments(imputed_db):
     return final_db
 
 #######################################################################################################################################
-# Step 5: Extraction of SMILES, PubChem2D and molecular descriptors from CASRN 
-# Uso il file "smiles_proc.py" per estrarre tutte le informazioni dal CASRN.
+''' Step 5: Extraction of SMILES, PubChem2D and molecular descriptors from CASRN 
+Uso il file "smiles_proc.py" per estrarre tutte le informazioni dal CASRN.
 
-# Se si vuole evitare di calcolarsi ex-novo tutti gli smiles, i pubchem e i descrittori molecolari (operazione di circa 2 ore) si può usare la funzione alternativa "process_chemicals" che prende in input un dataset con già queste info estratte.
-#
+Se si vuole evitare di calcolarsi ex-novo tutti gli smiles, i pubchem e i descrittori molecolari (operazione di circa 2 ore) si può usare la funzione alternativa "process_chemicals" che prende in input un dataset con già queste info estratte.
+'''
 
 def extract_chemical_data(final_db):
     chem = pd.DataFrame(final_db.test_cas.unique(), columns = ['test_cas'])
@@ -368,18 +368,18 @@ def extract_chemical_data(final_db):
     return chem
 
 
-# def process_chemicals(DATA_PATH_CHEMICAL_FEATURES):
+def process_chemicals(DATA_PATH_CHEMICAL_FEATURES):
     
-#     chem_feat = pd.read_csv(DATA_PATH_CHEMICAL_FEATURES).drop(columns = ['Unnamed: 0'])
+    chem_feat = pd.read_csv(DATA_PATH_CHEMICAL_FEATURES).drop(columns = ['Unnamed: 0'])
     
-#     chem_feat = adding_smiles_features(chem_feat)
-#     to_drop_nofeat = chem_feat[chem_feat['bonds_number'] == 'NaN'].index
-#     chem_feat.drop(index = to_drop_nofeat, inplace = True)
+    chem_feat = adding_smiles_features(chem_feat)
+    to_drop_nofeat = chem_feat[chem_feat['bonds_number'] == 'NaN'].index
+    chem_feat.drop(index = to_drop_nofeat, inplace = True)
     
-#     to_drop_null = chem_feat[chem_feat.isnull().any(axis = 1)].index
-#     chem_feat.drop(index = to_drop_null, inplace = True)
+    to_drop_null = chem_feat[chem_feat.isnull().any(axis = 1)].index
+    chem_feat.drop(index = to_drop_null, inplace = True)
     
-#     return chem_feat
+    return chem_feat
 
 #######################################################################################################################################
 # Step 4: Transformation of chemical features
