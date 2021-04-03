@@ -328,7 +328,7 @@ def cv_datafusion_rasar(X, y, db_datafusion, params = {}):
            'application_freq_unit',"exposure_type", "conc1_type", 'obs_duration_mean']
 
     non_categorical = ['ring_number', 'tripleBond', 'doubleBond', 'alone_atom_number', 'oh_count',
-                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+                   'atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP', 'MeltingPoint', 'WaterSolubility']
     
     print('Computing distance matrix...', ctime())
     distance_matrix = euc_ham_pub_matrix(X, non_categorical, categorical, 
