@@ -5,7 +5,7 @@ from smiles_proc import *
 
 
 def load_process_data(DATA_PATH_TESTS, DATA_PATH_RESULTS, DATA_PATH_SPECIES):
-    tests, species, results = load_raw_data(path_tests, path_results, path_species)
+    tests, species, results = load_raw_data(DATA_PATH_TESTS, DATA_PATH_RESULTS, DATA_PATH_SPECIES)
 
     prefiltered_data = prefilter(species, tests, results)
     
