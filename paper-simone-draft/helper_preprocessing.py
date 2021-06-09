@@ -210,6 +210,10 @@ def impute_conc(results_prefiltered):
     
     db = results_prefiltered.copy()
     
+#     conc_unit_best = ['mg/L', 'ppm', 'ppb', 'ug/L', 'ng/L']
+    
+#     db = db[db.conc1_unit.isin(conc_unit_best)].copy()
+    
     to_drop_conc_mean = db[db.conc1_mean == 'NR'].index
     db_filtered_mean = db.drop(index = to_drop_conc_mean).copy()
 
